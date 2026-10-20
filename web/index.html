@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Static Code Analysis and Bug Detection Workbench</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top System Header -->
+    <header class="app-header">
+        <div class="header-brand">
+            <span class="brand-badge">COMPILER PASS</span>
+            <h1 class="brand-title">Static Code Analysis &amp; Bug Detection Workbench</h1>
+            <span class="brand-sub">C-Subset Pipeline</span>
+        </div>
+
+        <div class="header-controls">
+            <div class="control-group">
+                <label for="sample-select" class="control-label">Sample Preset:</label>
+                <select id="sample-select" class="select-input">
+                    <option value="">-- Load Preset --</option>
+                </select>
+            </div>
+
+            <button id="btn-analyze" class="btn btn-primary" title="Execute Static Analysis (Ctrl+Enter)">
+                <span class="btn-text">Run Analysis</span>
+                <span class="btn-kbd">Ctrl+Enter</span>
+            </button>
+
+            <button id="btn-export" class="btn btn-secondary" title="Export diagnostic report">
+                Export Report
+            </button>
+
+            <button id="btn-theme" class="btn btn-utility" title="Toggle Light / Dark mode">
+                Theme: Dark
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Split Pane -->
+    <main class="workbench-layout">
+        <!-- Left Column: Source Editor -->
+        <section class="editor-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <span class="pane-label">SOURCE EDITOR</span>
+                    <span id="current-filename" class="file-tag">review1_sample.c</span>
+                </div>
+                <div class="editor-meta">
+                    <span id="editor-lines-count">9 lines</span>
+                    <span id="editor-char-count">112 chars</span>
+                    <span id="editor-cursor-pos">Ln 1, Col 1</span>
+                </div>
+            </div>
+
+            <div class="editor-wrapper">
+                <div id="editor-gutter" class="editor-gutter" aria-hidden="true"></div>
+                <textarea id="code-input" class="code-textarea" spellcheck="false" placeholder="// Enter C-like code here..."></textarea>
+            </div>
+
+            <div class="editor-footer">
+                <div class="footer-left">
+                    <span class="support-tag">Grammar: Variables, Types, Loops, Branches, Functions</span>
+                </div>
+                <div class="footer-right">
+                    <button id="btn-clear-code" class="btn-link">Clear</button>
+                    <button id="btn-reset-code" class="btn-link">Reset Sample</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Compiler Pipeline Inspector -->
+        <section class="inspector-pane">
+            <!-- Inspector Tabs Bar -->
+            <nav class="inspector-tabs" role="tablist">
+                <button class="tab-btn active" data-tab="tab-diagnostics" role="tab" aria-selected="true">
+                    Diagnostics <span id="diag-badge" class="count-badge">0</span>
+                </button>
+                <button class="tab-btn" data-tab="tab-cfg" role="tab" aria-selected="false">
+                    Control Flow Graph <span id="cfg-badge" class="count-badge">0</span>
+                </button>
+                <button class="tab-btn" data-tab="tab-symbols" role="tab" aria-selected="false">
+                    Symbol Table <span id="sym-badge" class="count-badge">0</span>
+                </button>
+                <button class="tab-btn" data-tab="tab-ast" role="tab" aria-selected="false">
+                    AST Inspector
+                </button>
+                <button class="tab-btn" data-tab="tab-tokens" role="tab" aria-selected="false">
+                    Tokens <span id="tokens-badge" class="count-badge">0</span>
+                </button>
+            </nav>
+
+            <!-- Tab 1: Diagnostics -->
+            <div id="tab-diagnostics" class="tab-pane active" role="tabpanel">
+                <!-- Metrics Summary Strip -->
+                <div class="metrics-grid">
+                    <div class="metric-card metric-error">
+                        <span class="metric-label">ERRORS</span>
+                        <span id="metric-errors-count" class="metric-value">0</span>
+                    </div>
+                    <div class="metric-card metric-warning">
+                        <span class="metric-label">WARNINGS</span>
+                        <span id="metric-warnings-count" class="metric-value">0</span>
+                    </div>
+                    <div class="metric-card metric-info">
+                        <span class="metric-label">INFO / QUALITY</span>
+                        <span id="metric-info-count" class="metric-value">0</span>
+                    </div>
+                    <div class="metric-card metric-perf">
+                        <span class="metric-label">PIPELINE LATENCY</span>
+                        <span id="metric-latency" class="metric-value">0.00 ms</span>
+                    </div>
+                </div>
+
+                <!-- Filters Strip -->
+                <div class="filter-strip">
+                    <div class="filter-group">
+                        <span class="filter-title">Severity:</span>
+                        <button class="filter-pill active" data-filter-sev="ALL">All</button>
+                        <button class="filter-pill" data-filter-sev="ERROR">Errors</button>
+                        <button class="filter-pill" data-filter-sev="WARNING">Warnings</button>
+                        <button class="filter-pill" data-filter-sev="INFO">Info</button>
+                    </div>
+
+                    <div class="filter-group">
+                        <span class="filter-title">Category:</span>
+                        <button class="filter-pill active" data-filter-cat="ALL">All</button>
+                        <button class="filter-pill" data-filter-cat="SEMANTIC">Semantic</button>
+                        <button class="filter-pill" data-filter-cat="INITIALIZATION">Initialization</button>
+                        <button class="filter-pill" data-filter-cat="CONTROL_FLOW">Control Flow</button>
+                        <button class="filter-pill" data-filter-cat="SAFETY">Safety</button>
+                    </div>
+                </div>
+
+                <!-- Diagnostics List -->
+                <div id="diagnostics-list" class="findings-container">
+                    <div class="empty-state">
+                        <p class="empty-title">Ready for Analysis</p>
+                        <p class="empty-desc">Click "Run Analysis" or press Ctrl+Enter to inspect the source code.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Control Flow Graph (CFG) -->
+            <div id="tab-cfg" class="tab-pane" role="tabpanel">
+                <div class="sub-toolbar">
+                    <div class="toolbar-left">
+                        <label for="cfg-fn-select" class="toolbar-label">Function:</label>
+                        <select id="cfg-fn-select" class="select-input select-sm"></select>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="view-pill active" data-cfg-view="svg">Vector Graph</button>
+                        <button class="view-pill" data-cfg-view="table">Blocks &amp; Flow Table</button>
+                        <button class="view-pill" data-cfg-view="dot">Graphviz DOT</button>
+                    </div>
+                </div>
+
+                <div id="cfg-view-svg" class="cfg-display active">
+                    <div id="cfg-svg-container" class="svg-viewport"></div>
+                </div>
+
+                <div id="cfg-view-table" class="cfg-display">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Block ID</th>
+                                    <th>Label</th>
+                                    <th>Instructions</th>
+                                    <th>Predecessors</th>
+                                    <th>Successors</th>
+                                    <th>Must-In (Initialized)</th>
+                                    <th>Must-Out (Initialized)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cfg-blocks-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="cfg-view-dot" class="cfg-display">
+                    <div class="dot-toolbar">
+                        <button id="btn-copy-dot" class="btn btn-secondary btn-sm">Copy DOT</button>
+                    </div>
+                    <pre id="cfg-dot-code" class="code-view"></pre>
+                </div>
+            </div>
+
+            <!-- Tab 3: Symbol Table -->
+            <div id="tab-symbols" class="tab-pane" role="tabpanel">
+                <div class="sub-toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-stat">Total Scopes: <strong id="sym-scopes-count">0</strong></span>
+                        <span class="toolbar-stat">Total Symbols: <strong id="sym-total-count">0</strong></span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Identifier</th>
+                                <th>Type</th>
+                                <th>Kind</th>
+                                <th>Scope ID</th>
+                                <th>Declared Line</th>
+                                <th>Initialized</th>
+                                <th>Used</th>
+                                <th>Use Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="symbols-tbody">
+                            <tr>
+                                <td colspan="8" class="text-muted text-center">Run analysis to populate symbol table.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 4: AST Inspector -->
+            <div id="tab-ast" class="tab-pane" role="tabpanel">
+                <div class="sub-toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-stat">Total AST Nodes: <strong id="ast-nodes-count">0</strong></span>
+                    </div>
+                    <div class="toolbar-right">
+                        <button id="btn-expand-ast" class="btn btn-secondary btn-sm">Expand All</button>
+                        <button id="btn-collapse-ast" class="btn btn-secondary btn-sm">Collapse All</button>
+                    </div>
+                </div>
+
+                <div id="ast-tree-container" class="tree-container">
+                    <p class="text-muted">Run analysis to generate the Abstract Syntax Tree.</p>
+                </div>
+            </div>
+
+            <!-- Tab 5: Tokens -->
+            <div id="tab-tokens" class="tab-pane" role="tabpanel">
+                <div class="sub-toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-stat">Total Tokens: <strong id="tokens-total-count">0</strong></span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Index</th>
+                                <th>Token Type</th>
+                                <th>Lexeme</th>
+                                <th>Literal Value</th>
+                                <th>Line:Col</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokens-tbody">
+                            <tr>
+                                <td colspan="5" class="text-muted text-center">Run analysis to inspect token stream.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Export Modal Dialog -->
+    <dialog id="export-dialog" class="modal-dialog">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Export Static Analysis Report</h3>
+                <button id="btn-close-export" class="modal-close" aria-label="Close dialog">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-options">
+                    <button id="btn-download-txt" class="btn btn-secondary">Download Text Report (.txt)</button>
+                    <button id="btn-download-json" class="btn btn-secondary">Download JSON Data (.json)</button>
+                    <button id="btn-copy-report" class="btn btn-primary">Copy Text to Clipboard</button>
+                </div>
+                <div class="export-preview-wrapper">
+                    <label class="control-label">Report Preview:</label>
+                    <textarea id="export-preview-text" class="code-textarea preview-textarea" readonly></textarea>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <script src="app.js"></script>
+</body>
+</html>
