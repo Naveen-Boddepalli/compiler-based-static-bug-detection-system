@@ -42,21 +42,27 @@ class DataFlowAnalyzer:
             for inst in b.instructions:
                 all_local_vars.update(inst.defined_vars)
 
-        # Initialize sets
-        for b in all_blocks:
-            self.must_in[b.id] = set()
-            self.must_out[b.id] = set()
-            self.may_in[b.id] = set()
-            self.may_out[b.id] = set()
-
-        # Entry block starts with function parameters initialized
+        # Parameters of this function
         params = set()
         for inst in self.cfg.entry_block.instructions:
             if inst.kind == InstructionKind.DECLARATION and inst.text.startswith("param "):
                 params.update(inst.defined_vars)
 
+        all_known_vars = all_local_vars | params
+
+        # Initialize sets
+        # In intersection-meet data-flow analysis, non-entry blocks must start at TOP (all variables)
+        for b in all_blocks:
+            self.must_in[b.id] = set(all_known_vars)
+            self.must_out[b.id] = set(all_known_vars)
+            self.may_in[b.id] = set()
+            self.may_out[b.id] = set()
+
+        # Entry block starts with function parameters initialized
         self.must_in[self.cfg.entry_block.id] = set(params)
+        self.must_out[self.cfg.entry_block.id] = set(params)
         self.may_in[self.cfg.entry_block.id] = set(params)
+        self.may_out[self.cfg.entry_block.id] = set(params)
 
         # Iterate MUST-initialized (definite assignment - intersection meet)
         changed = True
@@ -165,8 +171,8 @@ class DataFlowAnalyzer:
                 # Check all used variables
                 for var_name in inst.used_vars:
                     sym = self._lookup_symbol(var_name)
-                    # Only check variables (ignore function names or symbols not in current table)
-                    if sym is None or sym.kind == SymbolKind.FUNCTION:
+                    # Only check variables (ignore functions and parameters which are initialized on call)
+                    if sym is None or sym.kind in (SymbolKind.FUNCTION, SymbolKind.PARAMETER):
                         continue
 
                     loc = inst.range.start if inst.range else SourceLocation(1, 1)
