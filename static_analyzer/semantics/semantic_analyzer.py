@@ -144,7 +144,7 @@ class SemanticAnalyzer(ASTVisitor):
         if node.body is not None:
             old_fn = self.current_function
             self.current_function = node
-            self.symbol_table.enter_scope(f"function {node.name}")
+            node.scope = self.symbol_table.enter_scope(f"function {node.name}")
 
             # Define parameters in function scope
             for p, p_type in zip(node.parameters, param_types):

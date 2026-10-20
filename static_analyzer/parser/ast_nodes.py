@@ -322,6 +322,7 @@ class FunctionDeclaration(ASTNode):
     body: Optional[CompoundStatement]
     is_prototype: bool
     range: SourceRange
+    scope: Any = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
