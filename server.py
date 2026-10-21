@@ -124,11 +124,26 @@ class StaticAnalyzerHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def run_server(port: int = 8000, host: str = "127.0.0.1"):
-    server_address = (host, port)
-    httpd = http.server.HTTPServer(server_address, StaticAnalyzerHandler)
-    print(f"Static Analysis Workbench running at http://{host}:{port}/")
-    print(f"Press Ctrl+C to terminate server.")
+def run_server(port: int = 8000, host: str = "127.0.0.1", max_attempts: int = 5):
+    http.server.HTTPServer.allow_reuse_address = True
+    current_port = port
+
+    httpd = None
+    for attempt in range(max_attempts):
+        try:
+            server_address = (host, current_port)
+            httpd = http.server.HTTPServer(server_address, StaticAnalyzerHandler)
+            break
+        except OSError as e:
+            if attempt < max_attempts - 1:
+                print(f"Port {current_port} is in use, attempting port {current_port + 1}...")
+                current_port += 1
+            else:
+                print(f"Error: Could not bind to port {current_port}: {e}")
+                sys.exit(1)
+
+    print(f"Static Analysis Workbench running at http://{host}:{current_port}/")
+    print("Press Ctrl+C to terminate server.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

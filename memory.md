@@ -93,3 +93,10 @@ This document maintains a chronological record of architectural decisions, imple
 - 2026-10-20: Web workbench interface created with light/dark theme, interactive SVG CFG visualizer, AST tree inspector, and export dialog.
 - 2026-10-20: Curated C language presets added and verified against Review 1 specification.
 - 2026-10-21: Repository pushed and synced with GitHub remote origin at https://github.com/Naveen-Boddepalli/compiler-based-static-bug-detection-system.git.
+- 2026-10-21: Top-level snippet parsing implemented to seamlessly evaluate raw C statements (Slide 08 specification) without requiring explicit main() boilerplate.
+- 2026-10-21: Parser error recovery hardened against malformed tokens and cascade diagnostics using synthetic typed tokens and clean statement synchronization.
+- 2026-10-21: Semantic and initialization detectors hardened to ignore synthetic parser recovery tokens.
+- 2026-10-21: Server socket reuse (SO_REUSEADDR) and auto-increment port fallback implemented for presentation reliability.
+- 2026-10-21: Developer workbench UI polished with safe SVG viewport alignment and backdrop click dismissal.
+- 2026-10-21: Automated test suite expanded to 18 unit and integration tests (100% pass rate in < 0.005s).
+- 2026-10-21: Zero-emoji constraint validated across 100% of repository files.

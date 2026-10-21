@@ -59,6 +59,8 @@ class SemanticAnalyzer(ASTVisitor):
 
         for declarator in node.declarators:
             var_name = declarator.name
+            if var_name.startswith("<missing_"):
+                continue
             init_expr = declarator.initializer
 
             # Check for redeclaration in the same scope
@@ -102,6 +104,8 @@ class SemanticAnalyzer(ASTVisitor):
                         ))
 
     def visit_FunctionDeclaration(self, node: FunctionDeclaration):
+        if node.name.startswith("<missing_"):
+            return
         ret_type = resolve_type_by_name(node.return_type.name)
         param_types = [resolve_type_by_name(p.type_node.name) for p in node.parameters]
         fn_type = FunctionType(return_type=ret_type, param_types=param_types)

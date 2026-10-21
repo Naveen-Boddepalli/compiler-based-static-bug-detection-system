@@ -89,8 +89,8 @@ class Parser:
             range=cur.range,
             suggestion=suggestion
         ))
-        # Return current token as placeholder to avoid crashing
-        return cur
+        # Return a synthetic token of expected type so downstream AST nodes avoid type confusion
+        return Token(token_type, f"<missing_{token_type.name}>", None, cur.range)
 
     def _synchronize(self):
         """Advances until finding a statement boundary to resume parsing."""
@@ -149,29 +149,38 @@ class Parser:
         return TypeNode(name="int", range=cur.range)
 
     def _parse_external_declaration(self) -> Optional[ASTNode]:
-        """Parses a top-level function definition/declaration or global variable declaration."""
-        if not self._is_type_specifier():
-            cur = self._current()
-            self.diagnostics.append(Diagnostic(
-                severity=Severity.ERROR,
-                category=DiagnosticCategory.SYNTAX,
-                code="SYN-011",
-                message=f"Expected declaration specifier, got '{cur.lexeme}'",
-                location=cur.start_location,
-                range=cur.range,
-                suggestion="Declare a function or variable with a type"
-            ))
-            self._synchronize()
-            return None
+        """Parses a top-level function definition/declaration, global variable declaration, or statement."""
+        if self._is_type_specifier():
+            type_node = self._parse_type_specifier()
 
-        type_node = self._parse_type_specifier()
+            # Check if function or variable
+            # Look ahead for: type identifier ( ...
+            if self._check(TokenType.IDENTIFIER) and self._peek().type == TokenType.LPAREN:
+                return self._parse_function_declaration(type_node)
+            else:
+                return self._parse_variable_declaration(type_node)
 
-        # Check if function or variable
-        # Look ahead for: type identifier ( ...
-        if self._check(TokenType.IDENTIFIER) and self._peek().type == TokenType.LPAREN:
-            return self._parse_function_declaration(type_node)
-        else:
-            return self._parse_variable_declaration(type_node)
+        # Allow top-level statements for script/snippet inputs without main()
+        cur_type = self._current().type
+        if cur_type in (
+            TokenType.KW_IF, TokenType.KW_WHILE, TokenType.KW_FOR,
+            TokenType.KW_RETURN, TokenType.KW_BREAK, TokenType.KW_CONTINUE,
+            TokenType.LBRACE, TokenType.SEMICOLON, TokenType.IDENTIFIER
+        ):
+            return self._parse_statement()
+
+        cur = self._current()
+        self.diagnostics.append(Diagnostic(
+            severity=Severity.ERROR,
+            category=DiagnosticCategory.SYNTAX,
+            code="SYN-011",
+            message=f"Expected declaration specifier or statement, got '{cur.lexeme}'",
+            location=cur.start_location,
+            range=cur.range,
+            suggestion="Declare a function, variable, or statement"
+        ))
+        self._synchronize()
+        return None
 
     def _parse_function_declaration(self, return_type: TypeNode) -> Optional[FunctionDeclaration]:
         name_tok = self._consume(TokenType.IDENTIFIER, "SYN-012", "Expected function name")
@@ -234,7 +243,22 @@ class Parser:
         start_loc = type_node.range.start
 
         while True:
-            id_tok = self._consume(TokenType.IDENTIFIER, "SYN-017", "Expected variable identifier")
+            if not self._check(TokenType.IDENTIFIER):
+                cur = self._current()
+                self.diagnostics.append(Diagnostic(
+                    severity=Severity.ERROR,
+                    category=DiagnosticCategory.SYNTAX,
+                    code="SYN-017",
+                    message=f"Expected variable identifier, got '{cur.lexeme}'",
+                    location=cur.start_location,
+                    range=cur.range,
+                    suggestion="Specify a valid variable identifier"
+                ))
+                if not self._check(TokenType.SEMICOLON) and not self._is_at_end():
+                    self._advance()
+                break
+
+            id_tok = self._advance()
             init_expr: Optional[Expression] = None
             end_loc = id_tok.range.end
 

@@ -873,10 +873,18 @@ html, body {
 .svg-viewport {
     flex: 1;
     overflow: auto;
-    padding: 20px;
+    padding: 24px;
     display: flex;
-    justify-content: center;
+    justify-content: safe center;
+    align-items: flex-start;
     background-color: var(--bg-app);
+}
+
+.cfg-svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
 }
 
 .dot-toolbar {

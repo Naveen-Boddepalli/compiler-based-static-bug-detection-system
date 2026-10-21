@@ -162,6 +162,7 @@ compiler-based-static-but--detention-system/
 |-- README.md                       # Documentation
 |-- samples/                        # Curated C test programs
 |   |-- review1_sample.c
+|   |-- slide08_snippet.c
 |   |-- division_by_zero.c
 |   |-- dead_code_and_loops.c
 |   |-- scope_and_types.c

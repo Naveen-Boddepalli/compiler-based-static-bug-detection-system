@@ -37,6 +37,22 @@ class TestEndToEnd(unittest.TestCase):
         self.assertTrue(has_x_uninit)
         self.assertTrue(has_y_undecl)
 
+    def test_top_level_snippet_without_main(self):
+        """Tests snippet execution where top-level statements are evaluated directly (Slide 08 specification)."""
+        code = """
+        int x;
+        if (x > 10) {
+            return 0;
+        }
+        y = x + 5;
+        """
+        res = self.pipeline.analyze(code, "slide08_raw_snippet.c")
+        self.assertGreater(len(res.diagnostics), 0)
+        codes = [d.code for d in res.diagnostics]
+        self.assertIn("SEM-020", codes)
+        self.assertIn("INIT-001", codes)
+        self.assertGreaterEqual(len(res.cfgs), 1)
+
     def test_clean_valid_program(self):
         """Tests that a correct, well-formed program reports zero errors or warnings."""
         code = """

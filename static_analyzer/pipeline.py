@@ -8,7 +8,7 @@ from .common.source_location import SourceFile, SourceLocation, SourceRange
 from .common.diagnostic import Diagnostic, Severity, DiagnosticCategory
 from .lexer.tokens import Token
 from .lexer.lexer import Lexer
-from .parser.ast_nodes import Program, FunctionDeclaration, ASTNode
+from .parser.ast_nodes import Program, FunctionDeclaration, ASTNode, CompoundStatement, TypeNode, VariableDeclaration
 from .parser.parser import Parser
 from .semantics.symbol_table import SymbolTable
 from .semantics.semantic_analyzer import SemanticAnalyzer
@@ -150,6 +150,35 @@ class AnalyzerPipeline:
         parser = Parser(tokens, filename)
         ast, parse_diags = parser.parse()
         all_diagnostics.extend(parse_diags)
+
+        # Allow raw script snippets (e.g. Slide 08) by synthesizing an entry 'main' if needed
+        has_main = any(isinstance(d, FunctionDeclaration) and d.name == "main" and d.body is not None for d in ast.declarations)
+        if not has_main:
+            top_level_items = []
+            func_decls = []
+            has_executable_statement = False
+            for d in ast.declarations:
+                if isinstance(d, FunctionDeclaration):
+                    func_decls.append(d)
+                else:
+                    top_level_items.append(d)
+                    if not isinstance(d, VariableDeclaration):
+                        has_executable_statement = True
+
+            if top_level_items and (has_executable_statement or not func_decls):
+                start_loc = top_level_items[0].range.start if hasattr(top_level_items[0], 'range') and top_level_items[0].range else SourceLocation(1, 1)
+                end_loc = top_level_items[-1].range.end if hasattr(top_level_items[-1], 'range') and top_level_items[-1].range else SourceLocation(1, 1)
+                full_range = SourceRange(start_loc, end_loc)
+                body = CompoundStatement(statements=top_level_items, range=full_range)
+                main_fn = FunctionDeclaration(
+                    return_type=TypeNode(name="int", range=full_range),
+                    name="main",
+                    parameters=[],
+                    body=body,
+                    is_prototype=False,
+                    range=full_range
+                )
+                ast.declarations = func_decls + [main_fn]
 
         # 3. Semantic Analysis
         sem_analyzer = SemanticAnalyzer(filename)

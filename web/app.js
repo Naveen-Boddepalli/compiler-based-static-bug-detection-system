@@ -189,7 +189,8 @@
     function populateSampleSelect() {
         elements.sampleSelect.innerHTML = '<option value="">-- Load Preset --</option>';
         const titles = {
-            "review1_sample.c": "Review 1 Spec (Uninit + Undeclared)",
+            "review1_sample.c": "Review 1 Spec (With main Function)",
+            "slide08_snippet.c": "Slide 08 Exact Snippet (Direct Code)",
             "division_by_zero.c": "Division by Constant Zero & Modulo",
             "dead_code_and_loops.c": "Dead Code & Loop Defects",
             "scope_and_types.c": "Scope Violations & Redeclarations",
@@ -804,6 +805,18 @@
         // Export Modal
         elements.btnExport.addEventListener("click", openExportModal);
         elements.btnCloseExport.addEventListener("click", () => elements.exportDialog.close());
+
+        // Dismiss modal when clicking on the backdrop
+        elements.exportDialog.addEventListener("click", (e) => {
+            const rect = elements.exportDialog.getBoundingClientRect();
+            const isInDialog = (
+                rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+                rect.left <= e.clientX && e.clientX <= rect.left + rect.width
+            );
+            if (!isInDialog) {
+                elements.exportDialog.close();
+            }
+        });
 
         elements.btnDownloadTxt.addEventListener("click", () => {
             const txt = elements.exportPreviewText.value;

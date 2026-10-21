@@ -24,6 +24,8 @@ class InitializationDetector(BaseDetector):
 
         # 2. Unused variable detection
         for sym in symbol_table.get_all_symbols():
+            if sym.name.startswith("<missing_"):
+                continue
             if sym.kind == SymbolKind.VARIABLE:
                 if not sym.is_used:
                     diagnostics.append(Diagnostic(
