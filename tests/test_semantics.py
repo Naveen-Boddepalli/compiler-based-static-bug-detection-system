@@ -33,7 +33,7 @@ class TestSemantics(unittest.TestCase):
         sem = SemanticAnalyzer()
         _, diags = sem.analyze(ast)
         codes = [d.code for d in diags]
-        self.assertIn("SEM-022", codes) or self.assertIn("SEM-002", codes)
+        self.assertIn("SEM-002", codes)
 
     def test_type_mismatch_assignment(self):
         code = """

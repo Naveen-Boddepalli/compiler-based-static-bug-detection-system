@@ -129,7 +129,7 @@ class Lexer:
             # Check for hex
             if ch == "0" and (self._peek() == "x" or self._peek() == "X"):
                 lexeme += self._advance()
-                while self._peek() in "0123456789abcdefABCDEF":
+                while self._peek() and self._peek() in "0123456789abcdefABCDEF":
                     lexeme += self._advance()
                 end_loc = SourceLocation(self.line, self.column)
                 try:
