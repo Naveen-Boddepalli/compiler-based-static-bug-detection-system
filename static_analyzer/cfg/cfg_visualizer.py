@@ -30,7 +30,8 @@ class CFGVisualizer:
                     esc_text = html.escape(inst.text)
                     label_parts.append(esc_text)
 
-            label_html = f"<{ '<br align=\"left\"/>'.join(label_parts) }>"
+            inner_label = '<br align="left"/>'.join(label_parts)
+            label_html = f"<{inner_label}>"
 
             # Styling based on reachability and role
             if not block.is_reachable and not block.is_exit:

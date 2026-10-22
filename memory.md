@@ -107,3 +107,4 @@ This document maintains a chronological record of architectural decisions, imple
 - 2026-10-22: GitHub Actions CI/CD workflow created (.github/workflows/deploy.yml) for automated testing, emoji auditing, artifact building, and GitHub Pages deployment.
 - 2026-10-22: Client-side Pyodide WebAssembly runner and static asset packaging implemented in web/app.js and build_dist.py.
 - 2026-10-22: Dynamic static asset routing added to server.py and real-time engine mode indicator added to workbench header.
+- 2026-10-22: Fixed Python 3.11 backward compatibility in cfg_visualizer.py where f-string expressions containing backslashes caused CI test import failures.
