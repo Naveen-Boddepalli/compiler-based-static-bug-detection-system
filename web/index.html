@@ -16,6 +16,11 @@
         </div>
 
         <div class="header-controls">
+            <div id="engine-status-badge" class="engine-badge" title="Execution engine status">
+                <span class="engine-dot"></span>
+                <span id="engine-status-text">Engine: Initializing...</span>
+            </div>
+
             <div class="control-group">
                 <label for="sample-select" class="control-label">Sample Preset:</label>
                 <select id="sample-select" class="select-input">
@@ -288,6 +293,7 @@
         </div>
     </dialog>
 
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js" defer></script>
     <script src="app.js"></script>
 </body>
 </html>

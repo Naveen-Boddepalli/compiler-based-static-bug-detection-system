@@ -58,18 +58,29 @@ class StaticAnalyzerHandler(http.server.BaseHTTPRequestHandler):
             return
 
         # Serve static frontend files
-        if path == "/" or path == "/index.html":
+        rel_path = path.lstrip("/")
+        if not rel_path or rel_path == "index.html":
             file_path = os.path.join(WEB_DIR, "index.html")
-            content_type = "text/html; charset=utf-8"
-        elif path == "/style.css":
-            file_path = os.path.join(WEB_DIR, "style.css")
-            content_type = "text/css; charset=utf-8"
-        elif path == "/app.js":
-            file_path = os.path.join(WEB_DIR, "app.js")
-            content_type = "application/javascript; charset=utf-8"
         else:
+            clean_rel = os.path.normpath(rel_path).lstrip(os.sep)
+            file_path = os.path.join(WEB_DIR, clean_rel)
+
+        if not os.path.isfile(file_path):
             self._send_json(404, {"error": f"Resource not found: {path}"})
             return
+
+        ext = os.path.splitext(file_path)[1].lower()
+        mime_map = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".js": "application/javascript; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
+            ".zip": "application/zip",
+            ".svg": "image/svg+xml",
+            ".txt": "text/plain; charset=utf-8",
+            ".c": "text/plain; charset=utf-8"
+        }
+        content_type = mime_map.get(ext, "application/octet-stream")
 
         if os.path.isfile(file_path):
             with open(file_path, "rb") as f:

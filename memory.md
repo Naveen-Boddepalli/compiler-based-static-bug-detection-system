@@ -39,6 +39,10 @@ This document maintains a chronological record of architectural decisions, imple
 - Choice: High-density developer studio layout with split editor and tabbed inspector.
 - Rationale: Replaces generic AI card layouts with a precision engineering layout inspired by tools like Compiler Explorer (Godbolt) and IDE inspection windows. Features real-time line gutter, tab key indentation, vector SVG rendering for CFGs, interactive AST trees, and a persistent dark/light theme switch.
 
+### 7. Dual Execution Architecture (Local REST & In-Browser WebAssembly)
+- Choice: Support both Python HTTP server execution and client-side Pyodide WebAssembly.
+- Rationale: While running locally via server.py provides lightning-fast (< 1ms) execution, deploying to GitHub Pages requires serverless static hosting. By packaging the zero-dependency Python compiler into a tiny (39.6 KB) zip archive executed via Pyodide WebAssembly, the complete analyzer (AST, CFG, Data-Flow, Detectors) runs natively client-side in the browser on GitHub Pages without requiring any external backend server.
+
 ## Bug and Defect Catalog
 - Semantic:
   - SEM-001: Void variable declaration
@@ -100,3 +104,6 @@ This document maintains a chronological record of architectural decisions, imple
 - 2026-10-21: Developer workbench UI polished with safe SVG viewport alignment and backdrop click dismissal.
 - 2026-10-21: Automated test suite expanded to 18 unit and integration tests (100% pass rate in < 0.005s).
 - 2026-10-21: Zero-emoji constraint validated across 100% of repository files.
+- 2026-10-22: GitHub Actions CI/CD workflow created (.github/workflows/deploy.yml) for automated testing, emoji auditing, artifact building, and GitHub Pages deployment.
+- 2026-10-22: Client-side Pyodide WebAssembly runner and static asset packaging implemented in web/app.js and build_dist.py.
+- 2026-10-22: Dynamic static asset routing added to server.py and real-time engine mode indicator added to workbench header.

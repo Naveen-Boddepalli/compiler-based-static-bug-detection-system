@@ -86,8 +86,114 @@
         btnDownloadTxt: document.getElementById("btn-download-txt"),
         btnDownloadJson: document.getElementById("btn-download-json"),
         btnCopyReport: document.getElementById("btn-copy-report"),
-        exportPreviewText: document.getElementById("export-preview-text")
+        exportPreviewText: document.getElementById("export-preview-text"),
+
+        // Engine Status
+        engineBadge: document.getElementById("engine-status-badge"),
+        engineStatusText: document.getElementById("engine-status-text")
     };
+
+    // Engine State
+    const engineState = {
+        mode: "detecting",
+        pyodide: null,
+        pyodidePromise: null,
+        statusText: "Engine: Initializing..."
+    };
+
+    function setEngineMode(mode, text) {
+        engineState.mode = mode;
+        engineState.statusText = text;
+        if (elements.engineStatusText) {
+            elements.engineStatusText.textContent = text;
+        }
+        if (elements.engineBadge) {
+            elements.engineBadge.className = "engine-badge " + (
+                mode === "server" ? "engine-local" :
+                mode === "wasm" ? "engine-wasm" :
+                mode === "loading" ? "engine-loading" :
+                mode === "error" ? "engine-error" : ""
+            );
+        }
+    }
+
+    async function ensurePyodideReady() {
+        if (engineState.pyodide) return engineState.pyodide;
+        if (engineState.pyodidePromise) return engineState.pyodidePromise;
+
+        engineState.pyodidePromise = (async () => {
+            let retries = 0;
+            while (typeof loadPyodide === "undefined" && retries < 25) {
+                await new Promise(r => setTimeout(r, 200));
+                retries++;
+            }
+            if (typeof loadPyodide === "undefined") {
+                throw new Error("Pyodide WebAssembly library is not accessible");
+            }
+
+            setEngineMode("loading", "Engine: Loading Python Wasm...");
+            const pyodide = await loadPyodide({
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/"
+            });
+
+            setEngineMode("loading", "Engine: Unpacking Analyzer...");
+            const zipResp = await fetch("static_analyzer.zip");
+            if (!zipResp.ok) {
+                throw new Error(`Failed to load static_analyzer.zip: HTTP ${zipResp.status}`);
+            }
+            const zipBuf = await zipResp.arrayBuffer();
+            pyodide.FS.writeFile("static_analyzer.zip", new Uint8Array(zipBuf));
+
+            await pyodide.runPythonAsync(`
+import sys
+if "static_analyzer.zip" not in sys.path:
+    sys.path.insert(0, "static_analyzer.zip")
+from static_analyzer.pipeline import AnalyzerPipeline
+import json
+
+_pipeline = AnalyzerPipeline()
+
+def analyze_c_source(code, filename):
+    result = _pipeline.analyze(code, filename=filename)
+    return json.dumps(result.to_dict())
+`);
+            engineState.pyodide = pyodide;
+            setEngineMode("wasm", "Engine: WebAssembly (Wasm)");
+            return pyodide;
+        })();
+
+        return engineState.pyodidePromise;
+    }
+
+    async function initEngine() {
+        const isLocalHost = window.location.hostname === "localhost" ||
+                            window.location.hostname === "127.0.0.1" ||
+                            (window.location.port && window.location.port !== "80" && window.location.port !== "443" && !window.location.hostname.includes("github.io"));
+
+        if (isLocalHost) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1200);
+                const resp = await fetch("/api/health", { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (resp.ok) {
+                    setEngineMode("server", "Engine: Local Server");
+                    return;
+                }
+            } catch (err) {
+                // local server not responding, switch to wasm
+            }
+        }
+
+        setEngineMode("loading", "Engine: Initializing Wasm...");
+        try {
+            await ensurePyodideReady();
+            setEngineMode("wasm", "Engine: WebAssembly (Wasm)");
+        } catch (err) {
+            console.warn("Pyodide background pre-load error:", err);
+            setEngineMode("error", "Engine: Ready on Demand");
+        }
+    }
 
     // =========================================================================
     // Initialization
@@ -97,6 +203,7 @@
         applyTheme(state.theme);
         setupEventListeners();
         loadSamplesList();
+        initEngine();
         updateGutter();
         updateCursorPosition();
     }
@@ -176,14 +283,31 @@
             const resp = await fetch("/api/samples");
             if (resp.ok) {
                 const data = await resp.json();
-                state.samples = data.samples || {};
-                populateSampleSelect();
-            } else {
-                useFallbackSamples();
+                if (data.samples && Object.keys(data.samples).length > 0) {
+                    state.samples = data.samples;
+                    populateSampleSelect();
+                    return;
+                }
             }
         } catch (err) {
-            useFallbackSamples();
+            // API endpoint not available on static host
         }
+
+        try {
+            const staticResp = await fetch("samples.json");
+            if (staticResp.ok) {
+                const data = await staticResp.json();
+                if (data.samples && Object.keys(data.samples).length > 0) {
+                    state.samples = data.samples;
+                    populateSampleSelect();
+                    return;
+                }
+            }
+        } catch (err) {
+            // Static file not accessible
+        }
+
+        useFallbackSamples();
     }
 
     function populateSampleSelect() {
@@ -212,7 +336,12 @@
 
     function useFallbackSamples() {
         state.samples = {
-            "review1_sample.c": `// Review 1 Specification Test Case\nint main() {\n    int x;\n    if (x > 10) {\n        return 0;\n    }\n    y = x + 5;\n    return 0;\n}\n`
+            "review1_sample.c": "// Review 1 Specification Test Case\n// Demonstrates uninitialized variable access and undeclared variable use.\nint main() {\n    int x;\n    if (x > 10) {\n        return 0;\n    }\n    y = x + 5;\n    return 0;\n}\n",
+            "slide08_snippet.c": "// Slide 08 Exact Proposal Code Snippet\n// Demonstrates uninitialized variable access and undeclared variable without wrapping in main().\nint x;\nif (x > 10) {\n    return 0;\n}\ny = x + 5;\n",
+            "division_by_zero.c": "// Division by Zero & Safety Defects\n// Demonstrates constant division/modulo by zero and constant propagation.\nint calculate(int base) {\n    int zero_val = 0;\n    int direct_div = base / 0;\n    int propagated_div = base / zero_val;\n    int folded_div = base / (10 - 10);\n    int zero_mod = base % 0;\n    return direct_div + propagated_div + folded_div + zero_mod;\n}\n",
+            "dead_code_and_loops.c": "// Dead Code & Control-Flow Defects\n// Demonstrates statements after unconditional return, dead loop conditions, and unused variables.\nint process_values(int limit) {\n    int unused_cache = 100;\n\n    // Dead loop: condition is constant false (0)\n    while (0) {\n        int dead_iteration = 1;\n    }\n\n    if (limit > 50) {\n        return 1;\n        // Unreachable statement after unconditional return\n        int unreachable_after_return = limit * 2;\n    }\n\n    return 0;\n}\n",
+            "scope_and_types.c": "// Scope & Semantic Defects\n// Demonstrates duplicate declarations in the same scope, scope leakage, and void type misuse.\nint compute_scope(int val) {\n    int counter = 10;\n    // Duplicate declaration in same scope\n    int counter = 20;\n\n    if (val > 0) {\n        int inner_scoped_var = 50;\n    }\n\n    // Scope violation: inner_scoped_var is not accessible in outer scope\n    int total = inner_scoped_var + counter;\n\n    return total;\n}\n",
+            "clean_program.c": "// Clean, Well-Formed Program (0 Errors, 0 Warnings)\n// Demonstrates correct static analysis passing across functions, loops, and flow.\nint factorial(int n) {\n    int result = 1;\n    int i = 1;\n    while (i <= n) {\n        result = result * i;\n        i++;\n    }\n    return result;\n}\n\nint main() {\n    int input = 5;\n    int output = factorial(input);\n    return output;\n}\n"
         };
         populateSampleSelect();
     }
@@ -241,22 +370,53 @@
         elements.btnAnalyze.disabled = true;
 
         try {
-            const resp = await fetch("/api/analyze", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: code, filename: filename })
-            });
+            let result = null;
 
-            if (!resp.ok) {
-                const errData = await resp.json().catch(() => ({}));
-                throw new Error(errData.error || `Server responded with HTTP ${resp.status}`);
+            if (engineState.mode === "server") {
+                try {
+                    const resp = await fetch("/api/analyze", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ code: code, filename: filename })
+                    });
+                    if (resp.ok) {
+                        result = await resp.json();
+                    } else {
+                        const errData = await resp.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server responded with HTTP ${resp.status}`);
+                    }
+                } catch (netErr) {
+                    console.warn("Local server call failed, attempting WebAssembly execution...", netErr);
+                    setEngineMode("loading", "Engine: Switching to Wasm...");
+                    const pyodide = await ensurePyodideReady();
+                    setEngineMode("wasm", "Engine: WebAssembly (Wasm)");
+                    const startTime = performance.now();
+                    const runFn = pyodide.globals.get("analyze_c_source");
+                    const jsonStr = runFn(code, filename);
+                    const elapsedMs = performance.now() - startTime;
+                    result = JSON.parse(jsonStr);
+                    if (result && result.metrics) {
+                        result.metrics.elapsed_ms = Math.round(elapsedMs * 100) / 100;
+                    }
+                }
+            } else {
+                // WebAssembly mode (GitHub Pages or static host)
+                const pyodide = await ensurePyodideReady();
+                setEngineMode("wasm", "Engine: WebAssembly (Wasm)");
+                const startTime = performance.now();
+                const runFn = pyodide.globals.get("analyze_c_source");
+                const jsonStr = runFn(code, filename);
+                const elapsedMs = performance.now() - startTime;
+                result = JSON.parse(jsonStr);
+                if (result && result.metrics) {
+                    result.metrics.elapsed_ms = Math.round(elapsedMs * 100) / 100;
+                }
             }
 
-            const result = await resp.json();
             state.analysisResult = result;
             renderAnalysisResult(result);
         } catch (err) {
-            renderErrorBanner(err.message);
+            renderErrorBanner(err.message || String(err));
         } finally {
             elements.btnAnalyze.classList.remove("loading");
             elements.btnAnalyze.disabled = false;

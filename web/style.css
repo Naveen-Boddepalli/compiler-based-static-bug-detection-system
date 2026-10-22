@@ -160,6 +160,78 @@ html, body {
     gap: 10px;
 }
 
+.engine-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-subsurface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.engine-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    display: inline-block;
+}
+
+.engine-badge.engine-local .engine-dot {
+    background-color: var(--accent-green);
+    box-shadow: 0 0 5px var(--accent-green);
+}
+
+.engine-badge.engine-local {
+    color: var(--accent-green);
+    border-color: var(--accent-green-border);
+    background-color: var(--accent-green-bg);
+}
+
+.engine-badge.engine-wasm .engine-dot {
+    background-color: var(--accent-cyan);
+    box-shadow: 0 0 5px var(--accent-cyan);
+}
+
+.engine-badge.engine-wasm {
+    color: var(--accent-cyan);
+    border-color: var(--accent-cyan-border);
+    background-color: var(--accent-cyan-bg);
+}
+
+.engine-badge.engine-loading .engine-dot {
+    background-color: var(--accent-yellow);
+    animation: engine-pulse 1.2s infinite ease-in-out;
+}
+
+.engine-badge.engine-loading {
+    color: var(--accent-yellow);
+    border-color: var(--accent-yellow-border);
+    background-color: var(--accent-yellow-bg);
+}
+
+.engine-badge.engine-error .engine-dot {
+    background-color: var(--accent-red);
+}
+
+.engine-badge.engine-error {
+    color: var(--accent-red);
+    border-color: var(--accent-red-border);
+    background-color: var(--accent-red-bg);
+}
+
+@keyframes engine-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
 .control-group {
     display: flex;
     align-items: center;

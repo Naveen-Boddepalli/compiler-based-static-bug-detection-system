@@ -152,10 +152,30 @@ python3 -m unittest discover -s tests -v
 
 ---
 
-## 7. Project Structure
+## 7. Continuous Integration & GitHub Pages Deployment
+
+The repository includes an automated GitHub Actions CI/CD pipeline (`.github/workflows/deploy.yml`) that triggers on every push to `main` and on manual dispatch:
+
+1. **Automated Testing:** Executes the full unit and integration test suite.
+2. **Policy Enforcement:** Enforces the zero-emoji invariant and format standards across 100% of repository files.
+3. **Static Distribution Packaging:** Executes `build_dist.py` to package `static_analyzer.zip` and `samples.json` into the production `dist/` bundle with `.nojekyll`.
+4. **Automated GitHub Pages Deployment:** Deploys the web workbench directly to GitHub Pages with in-browser WebAssembly (Pyodide) support for 100% serverless execution.
+
+### Enabling GitHub Pages
+1. Go to repository **Settings** -> **Pages**.
+2. Under **Build and deployment** -> **Source**, select **GitHub Actions**.
+3. Pushes to `main` will build and publish the workbench to `https://<username>.github.io/<repo-name>/`.
+
+---
+
+## 8. Project Structure
 
 ```
 compiler-based-static-but--detention-system/
+|-- .github/
+|   `-- workflows/
+|       `-- deploy.yml              # GitHub Actions CI/CD pipeline for Pages
+|-- build_dist.py                   # Packaging script for static distribution
 |-- cli.py                          # Command-line interface
 |-- server.py                       # HTTP REST server and static host
 |-- memory.md                       # Project decisions and change history
