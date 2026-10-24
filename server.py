@@ -66,6 +66,20 @@ class StaticAnalyzerHandler(http.server.BaseHTTPRequestHandler):
             file_path = os.path.join(WEB_DIR, clean_rel)
 
         if not os.path.isfile(file_path):
+            if clean_rel == "static_analyzer.zip":
+                try:
+                    from build_dist import build_analyzer_zip
+                    build_analyzer_zip(file_path)
+                except Exception:
+                    pass
+            elif clean_rel == "samples.json":
+                try:
+                    from build_dist import build_samples_json
+                    build_samples_json(file_path)
+                except Exception:
+                    pass
+
+        if not os.path.isfile(file_path):
             self._send_json(404, {"error": f"Resource not found: {path}"})
             return
 

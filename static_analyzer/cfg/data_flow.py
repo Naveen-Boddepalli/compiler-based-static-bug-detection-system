@@ -48,7 +48,14 @@ class DataFlowAnalyzer:
             if inst.kind == InstructionKind.DECLARATION and inst.text.startswith("param "):
                 params.update(inst.defined_vars)
 
-        all_known_vars = all_local_vars | params
+        # Initialized global variables
+        globals_init = set()
+        if self.symbol_table and self.symbol_table.root_scope:
+            for s in self.symbol_table.root_scope.symbols.values():
+                if s.kind == SymbolKind.VARIABLE and s.is_initialized:
+                    globals_init.add(s.name)
+
+        all_known_vars = all_local_vars | params | globals_init
 
         # Initialize sets
         # In intersection-meet data-flow analysis, non-entry blocks must start at TOP (all variables)
@@ -58,11 +65,12 @@ class DataFlowAnalyzer:
             self.may_in[b.id] = set()
             self.may_out[b.id] = set()
 
-        # Entry block starts with function parameters initialized
-        self.must_in[self.cfg.entry_block.id] = set(params)
-        self.must_out[self.cfg.entry_block.id] = set(params)
-        self.may_in[self.cfg.entry_block.id] = set(params)
-        self.may_out[self.cfg.entry_block.id] = set(params)
+        # Entry block starts with function parameters and initialized globals
+        init_at_entry = params | globals_init
+        self.must_in[self.cfg.entry_block.id] = set(init_at_entry)
+        self.must_out[self.cfg.entry_block.id] = set(init_at_entry)
+        self.may_in[self.cfg.entry_block.id] = set(init_at_entry)
+        self.may_out[self.cfg.entry_block.id] = set(init_at_entry)
 
         # Iterate MUST-initialized (definite assignment - intersection meet)
         changed = True
@@ -140,20 +148,6 @@ class DataFlowAnalyzer:
             found = self.cfg.scope.lookup(name)
             if found is not None:
                 return found
-
-            def search_children(s):
-                for child in s.children:
-                    if name in child.symbols:
-                        return child.symbols[name]
-                    res = search_children(child)
-                    if res is not None:
-                        return res
-                return None
-
-            found_child = search_children(self.cfg.scope)
-            if found_child is not None:
-                return found_child
-
         return self.symbol_table.lookup(name)
 
     def _check_uninitialized_reads(self):
@@ -170,8 +164,12 @@ class DataFlowAnalyzer:
             for inst in b.instructions:
                 # Check all used variables
                 for var_name in inst.used_vars:
-                    sym = self._lookup_symbol(var_name)
-                    # Only check variables (ignore functions and parameters which are initialized on call)
+                    if hasattr(inst, "used_symbols") and var_name in inst.used_symbols:
+                        sym = inst.used_symbols[var_name]
+                    else:
+                        sym = self._lookup_symbol(var_name)
+
+                    # Only check declared variables (ignore undeclared, functions, and parameters initialized on call)
                     if sym is None or sym.kind in (SymbolKind.FUNCTION, SymbolKind.PARAMETER):
                         continue
 

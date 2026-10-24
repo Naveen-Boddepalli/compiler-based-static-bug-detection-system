@@ -33,6 +33,7 @@ class Instruction:
     range: Optional[SourceRange] = None
     defined_vars: Set[str] = field(default_factory=set)
     used_vars: Set[str] = field(default_factory=set)
+    used_symbols: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {

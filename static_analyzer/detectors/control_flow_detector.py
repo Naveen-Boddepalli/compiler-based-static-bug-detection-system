@@ -11,15 +11,15 @@ from ..parser.ast_nodes import (
 )
 from ..semantics.symbol_table import SymbolTable
 from ..cfg.basic_block import ControlFlowGraph
+from .safety_detector import fold_constant_numeric
 
 
 def is_constant_falsy(expr: Optional[Expression]) -> bool:
     """Checks if expression is a compile-time constant false/zero."""
     if expr is None:
         return False
-    if isinstance(expr, IntegerLiteralExpression) and expr.value == 0:
-        return True
-    if isinstance(expr, BoolLiteralExpression) and expr.value is False:
+    val = fold_constant_numeric(expr)
+    if val is not None and val == 0:
         return True
     return False
 
@@ -28,9 +28,8 @@ def is_constant_truthy(expr: Optional[Expression]) -> bool:
     """Checks if expression is a compile-time constant true/non-zero."""
     if expr is None:
         return False
-    if isinstance(expr, IntegerLiteralExpression) and expr.value != 0:
-        return True
-    if isinstance(expr, BoolLiteralExpression) and expr.value is True:
+    val = fold_constant_numeric(expr)
+    if val is not None and val != 0:
         return True
     return False
 
@@ -122,6 +121,31 @@ class ControlFlowDetector(BaseDetector):
                     range=node.condition.range,
                     suggestion="Remove unreachable else branch"
                 ))
+
+        elif isinstance(node, ForStatement):
+            if node.condition is not None and is_constant_falsy(node.condition):
+                diagnostics.append(Diagnostic(
+                    severity=Severity.WARNING,
+                    category=DiagnosticCategory.CONTROL_FLOW,
+                    code="CFG-002",
+                    message="For loop condition is constant false (0); loop body will never execute",
+                    location=node.condition.range.start,
+                    range=node.condition.range,
+                    suggestion="Remove dead loop or update condition expression"
+                ))
+            elif node.condition is None or is_constant_truthy(node.condition):
+                if not body_has_exit(node.body):
+                    loc = node.condition.range.start if node.condition else node.range.start
+                    rng = node.condition.range if node.condition else node.range
+                    diagnostics.append(Diagnostic(
+                        severity=Severity.WARNING,
+                        category=DiagnosticCategory.CONTROL_FLOW,
+                        code="CFG-003",
+                        message="Potential infinite loop: condition is constant true and body contains no 'break' or 'return'",
+                        location=loc,
+                        range=rng,
+                        suggestion="Add loop termination logic or 'break' statement"
+                    ))
 
         # Recurse children
         for attr_name in ("declarations", "statements", "body", "then_branch", "else_branch", "init"):

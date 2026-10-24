@@ -165,7 +165,9 @@ class Parser:
         if cur_type in (
             TokenType.KW_IF, TokenType.KW_WHILE, TokenType.KW_FOR,
             TokenType.KW_RETURN, TokenType.KW_BREAK, TokenType.KW_CONTINUE,
-            TokenType.LBRACE, TokenType.SEMICOLON, TokenType.IDENTIFIER
+            TokenType.LBRACE, TokenType.SEMICOLON, TokenType.IDENTIFIER,
+            TokenType.LPAREN, TokenType.INCREMENT, TokenType.DECREMENT,
+            TokenType.PLUS, TokenType.MINUS, TokenType.LOGICAL_NOT
         ):
             return self._parse_statement()
 

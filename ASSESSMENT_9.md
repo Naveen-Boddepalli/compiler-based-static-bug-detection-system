@@ -61,7 +61,7 @@ The proposed solution implements a complete end-to-end static analyzer:
 | **Defect Detectors** | `static_analyzer/detectors/` | Completed (100%) | Implements 28 distinct rules across Semantic (`SEM-001` to `SEM-028`), Initialization (`INIT-001` to `INIT-004`), Control Flow (`CFG-001` to `CFG-005`), and Safety (`SAFE-001`, `SAFE-002`). |
 | **CLI & Pipeline Orchestration** | `cli.py`, `pipeline.py` | Completed (100%) | Unified pipeline runner; supports `--json`, `--dot`, `--check-only`, and `--serve` CLI flags. |
 | **Interactive Workbench UI** | `web/`, `server.py` | Completed (90%) | Split-pane IDE interface, line-numbered code editor, live diagnostic log, interactive AST tree inspector, SVG CFG viewer, and dark/light themes. |
-| **Test Suite** | `tests/` | Completed (100%) | Automated unit and integration test suite (18 test cases, 100% pass rate in < 0.005s). |
+| **Test Suite** | `tests/` | Completed (100%) | Automated unit and integration test suite (26 test cases, 100% pass rate in < 0.005s). |
 
 ### Technologies, tools, programming languages, and platforms used
 - **Core Implementation Language:** Python 3 (Python 3.8+ compatibility).
@@ -115,11 +115,11 @@ flowchart TD
   - Infinite loops lacking exit/break conditions.
   - Division by zero and modulo by zero using local constant propagation.
 - **Performance Benchmark:** Full compilation, AST construction, CFG generation, data-flow analysis, and bug detection executes in **< 1 millisecond** per source file.
-- **Test Results:** 18 unit and integration tests passing with 0 failures:
+- **Test Results:** 26 unit and integration tests passing with 0 failures:
   ```text
-  ..................
+  ..........................
   ----------------------------------------------------------------------
-  Ran 18 tests in 0.003s
+  Ran 26 tests in 0.004s
   OK
   ```
 

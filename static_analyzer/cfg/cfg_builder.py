@@ -44,6 +44,32 @@ def extract_used_vars(expr: Optional[Expression]) -> Set[str]:
     return used
 
 
+def extract_used_symbols(expr: Optional[Expression]) -> dict:
+    """Recursively collects variable name -> Symbol mappings for variables read in expr."""
+    if expr is None:
+        return {}
+    used = {}
+    if isinstance(expr, IdentifierExpression):
+        if hasattr(expr, "symbol") and expr.symbol is not None:
+            used[expr.name] = expr.symbol
+    elif isinstance(expr, BinaryExpression):
+        used.update(extract_used_symbols(expr.left))
+        used.update(extract_used_symbols(expr.right))
+    elif isinstance(expr, UnaryExpression):
+        used.update(extract_used_symbols(expr.operand))
+    elif isinstance(expr, AssignmentExpression):
+        used.update(extract_used_symbols(expr.value))
+        if expr.operator != "=":
+            if hasattr(expr.target, "symbol") and expr.target.symbol is not None:
+                used[expr.target.name] = expr.target.symbol
+    elif isinstance(expr, FunctionCallExpression):
+        for arg in expr.arguments:
+            used.update(extract_used_symbols(arg))
+    elif isinstance(expr, GroupedExpression):
+        used.update(extract_used_symbols(expr.expression))
+    return used
+
+
 def stringify_expr(expr: Optional[Expression]) -> str:
     """Produces a clean textual representation of an expression for block instructions."""
     if expr is None:
@@ -145,9 +171,11 @@ class CFGBuilder:
                 text = f"{stmt.type_node.name} {decl.name}"
                 defined = set()
                 used = set()
+                sym_used = {}
                 if decl.initializer is not None:
                     text += f" = {stringify_expr(decl.initializer)}"
                     used = extract_used_vars(decl.initializer)
+                    sym_used = extract_used_symbols(decl.initializer)
                     defined.add(decl.name)
 
                 current_block.add_instruction(Instruction(
@@ -156,7 +184,8 @@ class CFGBuilder:
                     ast_node=decl,
                     range=decl.range,
                     defined_vars=defined,
-                    used_vars=used
+                    used_vars=used,
+                    used_symbols=sym_used
                 ))
             return current_block
 
@@ -165,6 +194,7 @@ class CFGBuilder:
                 expr = stmt.expression
                 defined = set()
                 used = extract_used_vars(expr)
+                sym_used = extract_used_symbols(expr)
                 kind = InstructionKind.EXPRESSION
 
                 if isinstance(expr, AssignmentExpression):
@@ -175,6 +205,8 @@ class CFGBuilder:
                     if isinstance(expr.operand, IdentifierExpression):
                         defined.add(expr.operand.name)
                         used.add(expr.operand.name)
+                        if hasattr(expr.operand, "symbol") and expr.operand.symbol is not None:
+                            sym_used[expr.operand.name] = expr.operand.symbol
 
                 current_block.add_instruction(Instruction(
                     kind=kind,
@@ -182,7 +214,8 @@ class CFGBuilder:
                     ast_node=expr,
                     range=expr.range,
                     defined_vars=defined,
-                    used_vars=used
+                    used_vars=used,
+                    used_symbols=sym_used
                 ))
             return current_block
 
@@ -194,7 +227,8 @@ class CFGBuilder:
                 ast_node=stmt.condition,
                 range=stmt.condition.range,
                 defined_vars=set(),
-                used_vars=extract_used_vars(stmt.condition)
+                used_vars=extract_used_vars(stmt.condition),
+                used_symbols=extract_used_symbols(stmt.condition)
             ))
 
             then_block = self._new_block("if_then_")
@@ -233,7 +267,8 @@ class CFGBuilder:
                 ast_node=stmt.condition,
                 range=stmt.condition.range,
                 defined_vars=set(),
-                used_vars=extract_used_vars(stmt.condition)
+                used_vars=extract_used_vars(stmt.condition),
+                used_symbols=extract_used_symbols(stmt.condition)
             ))
 
             self.cfg.add_edge(header_block, body_block, EdgeKind.TRUE_BRANCH, "true")
@@ -270,7 +305,8 @@ class CFGBuilder:
                     ast_node=stmt.condition,
                     range=stmt.condition.range,
                     defined_vars=set(),
-                    used_vars=extract_used_vars(stmt.condition)
+                    used_vars=extract_used_vars(stmt.condition),
+                    used_symbols=extract_used_symbols(stmt.condition)
                 ))
             else:
                 header_block.add_instruction(Instruction(
@@ -279,7 +315,8 @@ class CFGBuilder:
                     ast_node=None,
                     range=stmt.range,
                     defined_vars=set(),
-                    used_vars=set()
+                    used_vars=set(),
+                    used_symbols={}
                 ))
 
             self.cfg.add_edge(header_block, body_block, EdgeKind.TRUE_BRANCH, "true")
@@ -289,12 +326,15 @@ class CFGBuilder:
             if stmt.step is not None:
                 step_def = set()
                 step_use = extract_used_vars(stmt.step)
+                step_sym_use = extract_used_symbols(stmt.step)
                 if isinstance(stmt.step, AssignmentExpression):
                     step_def.add(stmt.step.target.name)
                 elif isinstance(stmt.step, UnaryExpression) and stmt.step.operator in ("++", "--"):
                     if isinstance(stmt.step.operand, IdentifierExpression):
                         step_def.add(stmt.step.operand.name)
                         step_use.add(stmt.step.operand.name)
+                        if hasattr(stmt.step.operand, "symbol") and stmt.step.operand.symbol is not None:
+                            step_sym_use[stmt.step.operand.name] = stmt.step.operand.symbol
 
                 step_block.add_instruction(Instruction(
                     kind=InstructionKind.EXPRESSION,
@@ -302,7 +342,8 @@ class CFGBuilder:
                     ast_node=stmt.step,
                     range=stmt.step.range,
                     defined_vars=step_def,
-                    used_vars=step_use
+                    used_vars=step_use,
+                    used_symbols=step_sym_use
                 ))
             self.cfg.add_edge(step_block, header_block, EdgeKind.JUMP, "loop")
 
@@ -318,10 +359,12 @@ class CFGBuilder:
 
         if isinstance(stmt, ReturnStatement):
             used = set()
+            sym_used = {}
             text = "return"
             if stmt.expression is not None:
                 text += f" {stringify_expr(stmt.expression)}"
                 used = extract_used_vars(stmt.expression)
+                sym_used = extract_used_symbols(stmt.expression)
 
             current_block.add_instruction(Instruction(
                 kind=InstructionKind.RETURN,
@@ -329,7 +372,8 @@ class CFGBuilder:
                 ast_node=stmt,
                 range=stmt.range,
                 defined_vars=set(),
-                used_vars=used
+                used_vars=used,
+                used_symbols=sym_used
             ))
 
             if self.cfg.exit_block is not None:

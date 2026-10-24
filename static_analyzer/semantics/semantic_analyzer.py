@@ -87,6 +87,7 @@ class SemanticAnalyzer(ASTVisitor):
                     is_initialized=(init_expr is not None)
                 )
                 self.symbol_table.define(sym)
+                declarator.symbol = sym
 
             # Analyze initializer if present
             if init_expr is not None:
@@ -122,6 +123,17 @@ class SemanticAnalyzer(ASTVisitor):
                     range=node.range,
                     related_locations=[existing.declared_location]
                 ))
+            elif existing.type != fn_type:
+                self.diagnostics.append(Diagnostic(
+                    severity=Severity.ERROR,
+                    category=DiagnosticCategory.SEMANTIC,
+                    code="SEM-005",
+                    message=f"Conflicting types in redeclaration of function '{node.name}': declared as '{fn_type}', previous declaration was '{existing.type}'",
+                    location=node.range.start,
+                    range=node.range,
+                    suggestion=f"Ensure function signature matches previous declaration at line {existing.declared_location.line}",
+                    related_locations=[existing.declared_location]
+                ))
             elif node.body is not None and existing.is_initialized:
                 self.diagnostics.append(Diagnostic(
                     severity=Severity.ERROR,
@@ -133,6 +145,8 @@ class SemanticAnalyzer(ASTVisitor):
                     suggestion=f"Function was already defined at line {existing.declared_location.line}",
                     related_locations=[existing.declared_location]
                 ))
+            elif node.body is not None and not existing.is_initialized:
+                existing.is_initialized = True
         else:
             sym = Symbol(
                 name=node.name,
@@ -170,6 +184,7 @@ class SemanticAnalyzer(ASTVisitor):
                     scope_id=self.symbol_table.current_scope.scope_id,
                     is_initialized=True
                 )
+                p.symbol = p_sym
                 if not self.symbol_table.define(p_sym):
                     self.diagnostics.append(Diagnostic(
                         severity=Severity.ERROR,
@@ -183,6 +198,31 @@ class SemanticAnalyzer(ASTVisitor):
             # Traverse body statements directly inside the function's scope
             for stmt in node.body.statements:
                 stmt.accept(self)
+
+            if not ret_type.is_void() and node.name != "main":
+                def has_return_statement(stmt: ASTNode) -> bool:
+                    if isinstance(stmt, ReturnStatement):
+                        return True
+                    if isinstance(stmt, CompoundStatement):
+                        for s in stmt.statements:
+                            if has_return_statement(s):
+                                return True
+                    if isinstance(stmt, IfStatement):
+                        return has_return_statement(stmt.then_branch) or (has_return_statement(stmt.else_branch) if stmt.else_branch else False)
+                    if isinstance(stmt, (WhileStatement, ForStatement)):
+                        return has_return_statement(stmt.body)
+                    return False
+
+                if not has_return_statement(node.body):
+                    self.diagnostics.append(Diagnostic(
+                        severity=Severity.ERROR,
+                        category=DiagnosticCategory.SEMANTIC,
+                        code="SEM-012",
+                        message=f"Function '{node.name}' must return a value of type '{ret_type}'",
+                        location=node.range.start,
+                        range=node.range,
+                        suggestion=f"Provide a return value of type '{ret_type}'"
+                    ))
 
             self.symbol_table.exit_scope()
             self.current_function = old_fn
@@ -330,6 +370,7 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_IdentifierExpression(self, node: IdentifierExpression) -> CType:
         sym = self.symbol_table.lookup(node.name)
+        node.symbol = sym
         if sym is None:
             self.diagnostics.append(Diagnostic(
                 severity=Severity.ERROR,
@@ -380,6 +421,8 @@ class SemanticAnalyzer(ASTVisitor):
                 ))
                 return ErrorType()
             sym = self.symbol_table.lookup(node.operand.name)
+            node.operand.symbol = sym
+            node.symbol = sym
             if sym is not None:
                 sym.mark_assigned(node.range.start)
             return op_type
@@ -423,6 +466,8 @@ class SemanticAnalyzer(ASTVisitor):
         val_type = node.value.accept(self)
         target_name = node.target.name
         sym = self.symbol_table.lookup(target_name)
+        node.target.symbol = sym
+        node.symbol = sym
 
         if sym is None:
             self.diagnostics.append(Diagnostic(
@@ -437,6 +482,8 @@ class SemanticAnalyzer(ASTVisitor):
             return ErrorType()
 
         sym.mark_assigned(node.range.start)
+        if node.operator != "=":
+            sym.mark_used(node.target.range.start)
 
         if not isinstance(val_type, ErrorType) and not isinstance(sym.type, ErrorType):
             if not sym.type.is_compatible_with(val_type):
@@ -505,5 +552,9 @@ class SemanticAnalyzer(ASTVisitor):
                     location=arg_expr.range.start,
                     range=arg_expr.range
                 ))
+
+        if actual_count > expected_count:
+            for extra_arg in node.arguments[expected_count:]:
+                extra_arg.accept(self)
 
         return fn_type.return_type

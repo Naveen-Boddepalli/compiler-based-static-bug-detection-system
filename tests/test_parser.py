@@ -44,6 +44,13 @@ class TestParser(unittest.TestCase):
         self.assertIsInstance(stmts[0], VariableDeclaration)
         self.assertIsInstance(stmts[1], WhileStatement)
 
+    def test_top_level_expression_parsing(self):
+        code = "int x = 0; ++x; (x = 5);"
+        tokens, _ = Lexer(code).tokenize()
+        ast, diags = Parser(tokens).parse()
+        self.assertEqual(len(diags), 0)
+        self.assertEqual(len(ast.declarations), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

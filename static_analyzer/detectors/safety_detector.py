@@ -6,9 +6,9 @@ from ..common.source_location import SourceLocation, SourceRange
 from ..common.diagnostic import Diagnostic, Severity, DiagnosticCategory
 from ..parser.ast_nodes import (
     Program, ASTNode, BinaryExpression, IntegerLiteralExpression,
-    FloatLiteralExpression, GroupedExpression, AssignmentExpression,
-    IdentifierExpression, VariableDeclaration, CompoundStatement,
-    Expression
+    FloatLiteralExpression, BoolLiteralExpression, UnaryExpression,
+    GroupedExpression, AssignmentExpression, IdentifierExpression,
+    VariableDeclaration, CompoundStatement, Expression
 )
 from ..semantics.symbol_table import SymbolTable
 from ..cfg.basic_block import ControlFlowGraph
@@ -22,12 +22,24 @@ def fold_constant_numeric(expr: Optional[Expression], constants: Optional[Dict[s
         return expr.value
     if isinstance(expr, FloatLiteralExpression):
         return expr.value
+    if isinstance(expr, BoolLiteralExpression):
+        return 1 if expr.value else 0
     if isinstance(expr, IdentifierExpression):
         if constants and expr.name in constants:
             return constants[expr.name]
         return None
     if isinstance(expr, GroupedExpression):
         return fold_constant_numeric(expr.expression, constants)
+    if isinstance(expr, UnaryExpression):
+        val = fold_constant_numeric(expr.operand, constants)
+        if val is not None:
+            if expr.operator == "+":
+                return +val
+            elif expr.operator == "-":
+                return -val
+            elif expr.operator == "!":
+                return 0 if val else 1
+        return None
     if isinstance(expr, BinaryExpression):
         left_val = fold_constant_numeric(expr.left, constants)
         right_val = fold_constant_numeric(expr.right, constants)
@@ -42,11 +54,29 @@ def fold_constant_numeric(expr: Optional[Expression], constants: Optional[Dict[s
                 elif expr.operator == "/":
                     if right_val == 0:
                         return 0  # Flag division by zero
-                    return left_val / right_val
+                    if isinstance(left_val, float) or isinstance(right_val, float):
+                        return left_val / right_val
+                    return int(left_val / right_val)
                 elif expr.operator == "%":
                     if right_val == 0:
                         return 0
                     return int(left_val) % int(right_val)
+                elif expr.operator == "==":
+                    return 1 if left_val == right_val else 0
+                elif expr.operator == "!=":
+                    return 1 if left_val != right_val else 0
+                elif expr.operator == "<":
+                    return 1 if left_val < right_val else 0
+                elif expr.operator == "<=":
+                    return 1 if left_val <= right_val else 0
+                elif expr.operator == ">":
+                    return 1 if left_val > right_val else 0
+                elif expr.operator == ">=":
+                    return 1 if left_val >= right_val else 0
+                elif expr.operator == "&&":
+                    return 1 if (left_val and right_val) else 0
+                elif expr.operator == "||":
+                    return 1 if (left_val or right_val) else 0
             except Exception:
                 return None
     return None
@@ -83,6 +113,21 @@ class SafetyDetector(BaseDetector):
                     constants[target] = val
                 elif target in constants:
                     del constants[target]
+            elif node.operator == "+=":
+                if target in constants and val is not None:
+                    constants[target] = constants[target] + val
+                elif target in constants:
+                    del constants[target]
+            elif node.operator == "-=":
+                if target in constants and val is not None:
+                    constants[target] = constants[target] - val
+                elif target in constants:
+                    del constants[target]
+            elif node.operator == "*=":
+                if target in constants and val is not None:
+                    constants[target] = constants[target] * val
+                elif target in constants:
+                    del constants[target]
             elif node.operator == "/=":
                 if val is not None and val == 0:
                     diagnostics.append(Diagnostic(
@@ -94,6 +139,10 @@ class SafetyDetector(BaseDetector):
                         range=node.value.range,
                         suggestion="Ensure divisor is non-zero"
                     ))
+                elif target in constants and val is not None and val != 0:
+                    constants[target] = int(constants[target] / val)
+                elif target in constants:
+                    del constants[target]
             elif node.operator == "%=":
                 if val is not None and val == 0:
                     diagnostics.append(Diagnostic(
@@ -105,6 +154,21 @@ class SafetyDetector(BaseDetector):
                         range=node.value.range,
                         suggestion="Ensure divisor is non-zero"
                     ))
+                elif target in constants and val is not None and val != 0:
+                    constants[target] = int(constants[target]) % int(val)
+                elif target in constants:
+                    del constants[target]
+            return
+
+        if isinstance(node, UnaryExpression) and node.operator in ("++", "--"):
+            self._check_ast_safety(node.operand, diagnostics, constants)
+            if isinstance(node.operand, IdentifierExpression):
+                target = node.operand.name
+                if target in constants:
+                    if node.operator == "++":
+                        constants[target] += 1
+                    else:
+                        constants[target] -= 1
             return
 
         if isinstance(node, BinaryExpression):

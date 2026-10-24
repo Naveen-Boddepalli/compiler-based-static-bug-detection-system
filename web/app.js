@@ -352,6 +352,7 @@ def analyze_c_source(code, filename):
             elements.sampleSelect.value = filename;
             elements.codeInput.value = state.samples[filename];
             elements.currentFilename.textContent = filename;
+            state.selectedFunctionIndex = 0;
             updateGutter();
             updateCursorPosition();
             runAnalysis();
@@ -562,16 +563,16 @@ def analyze_c_source(code, filename):
             return;
         }
 
+        if (state.selectedFunctionIndex >= cfgs.length || state.selectedFunctionIndex < 0) {
+            state.selectedFunctionIndex = 0;
+        }
+
         // Populate Function selector
         elements.cfgFnSelect.innerHTML = cfgs.map((c, idx) => `
             <option value="${idx}" ${idx === state.selectedFunctionIndex ? "selected" : ""}>
                 function ${escapeHtml(c.function_name)} (${c.cfg.total_blocks} blocks)
             </option>
         `).join("");
-
-        if (state.selectedFunctionIndex >= cfgs.length) {
-            state.selectedFunctionIndex = 0;
-        }
 
         renderCurrentCfg();
     }
@@ -999,7 +1000,7 @@ def analyze_c_source(code, filename):
     }
 
     function escapeHtml(str) {
-        if (!str) return "";
+        if (str === null || str === undefined) return "";
         return String(str)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")

@@ -108,3 +108,9 @@ This document maintains a chronological record of architectural decisions, imple
 - 2026-10-22: Client-side Pyodide WebAssembly runner and static asset packaging implemented in web/app.js and build_dist.py.
 - 2026-10-22: Dynamic static asset routing added to server.py and real-time engine mode indicator added to workbench header.
 - 2026-10-22: Fixed Python 3.11 backward compatibility in cfg_visualizer.py where f-string expressions containing backslashes caused CI test import failures.
+- 2026-10-24: Resolved data-flow definite assignment false positives for initialized global variables and eliminated spurious uninitialized warnings on undeclared variables.
+- 2026-10-24: Hardened compound assignment statements to mark target variables as used and track constant updates.
+- 2026-10-24: Expanded constant folding for unary expressions (negative literals and inverted conditions), grouped expressions, and boolean literals across safety and control-flow detectors.
+- 2026-10-24: Added for-loop constant dead condition (CFG-002) and infinite loop (CFG-003) checks, prototype signature matching, and non-void missing return checks (SEM-012).
+- 2026-10-24: Fixed workbench UI function selector bounds and HTML escaping, and added on-demand distribution asset generation to server.py.
+- 2026-10-24: Expanded unit test suite from 18 to 26 tests (100% pass rate in 0.004s).
